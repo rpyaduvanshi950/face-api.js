@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 <head>
   <script src="face-api.js"></script>
@@ -23,8 +23,8 @@
     </div>
 
     <div class="row side-by-side">
-      <!-- image_selection_control -->
-      <div id="selectList"></div>
+      <!-- image_selection_control 
+       div id="selectList"></div>
       <div class="row">
         <label for="imgUrlInput">Get image from URL:</label>
         <input id="imgUrlInput" type="text" class="bold">
@@ -36,12 +36,10 @@
         Ok
       </button>
       <input id="queryImgUploadInput" type="file" class="waves-effect btn bold" onchange="loadImageFromUpload()" accept=".jpg, .jpeg, .png">
-      <!-- image_selection_control -->
+      <!-- image_selection_control 
     </div>
 
     <div class="row side-by-side">
-
-      <!-- face_detector_selection_control -->
       <div id="face_detector_selection_control" class="row input-field" style="margin-right: 20px;">
         <select id="selectFaceDetector">
           <option value="ssd_mobilenetv1">SSD Mobilenet V1</option>
@@ -49,18 +47,14 @@
         </select>
         <label>Select Face Detector</label>
       </div>
-      <!-- face_detector_selection_control -->
-
-      <!-- check boxes -->
       <div class="row" style="width: 220px;">
         <input type="checkbox" id="hideBoundingBoxesCheckbox" onchange="onChangeHideBoundingBoxes(event)" />
         <label for="hideBoundingBoxesCheckbox">Hide Bounding Boxes</label>
       </div>
-      <!-- check boxes -->
+      
 
     </div>
 
-    <!-- ssd_mobilenetv1_controls -->
     <span id="ssd_mobilenetv1_controls">
       <div class="row side-by-side">
         <div class="row">
@@ -81,9 +75,6 @@
         </button>
       </div>
     </span>
-    <!-- ssd_mobilenetv1_controls -->
-
-    <!-- tiny_face_detector_controls -->
     <span id="tiny_face_detector_controls">
       <div class="row side-by-side">
         <div class="row input-field" style="margin-right: 20px;">
@@ -116,7 +107,7 @@
         </button>
       </div>
     </span>
-    <!-- tiny_face_detector_controls -->
+    <!-- tiny_face_detector_controls 
 
   </body>
 
@@ -163,6 +154,151 @@
       initFaceDetectionControls()
       run()
     })
+  </script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="face-api.js"></script>
+  <script src="js/commons.js"></script>
+  <script src="js/faceDetectionControls.js"></script>
+  <script src="js/imageSelectionControls.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+  <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+  <style>
+    .scrollable-box {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-top: 20px;
+      max-width: 300px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: Arial, sans-serif;
+    }
+
+    .scrollable-content {
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .scrollable-content h6 {
+      margin: 10px 0 5px;
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="navbar"></div>
+  <div class="center-content page-container">
+    <div class="progress" id="loader">
+      <div class="indeterminate"></div>
+    </div>
+    <div style="position: relative" class="margin">
+      <img id="inputImg" src="" style="max-width: 800px;" />
+      <canvas id="overlay"></canvas>
+    </div>
+    <div class="row side-by-side">
+      <div id="selectList"></div>
+      <div class="row">
+        <label for="imgUrlInput">Get image from URL:</label>
+        <input id="imgUrlInput" type="text" class="bold">
+      </div>
+      <button class="waves-effect waves-light btn" onclick="loadImageFromUrl()">Ok</button>
+      <input id="queryImgUploadInput" type="file" class="waves-effect btn bold" onchange="loadImageFromUpload()" accept=".jpg, .jpeg, .png">
+    </div>
+    <div class="row side-by-side">
+      <div id="face_detector_selection_control" class="row input-field" style="margin-right: 20px;">
+        <select id="selectFaceDetector">
+          <option value="ssd_mobilenetv1">SSD Mobilenet V1</option>
+          <option value="tiny_face_detector">Tiny Face Detector</option>
+        </select>
+        <label>Select Face Detector</label>
+      </div>
+      <div class="row" style="width: 220px;">
+        <input type="checkbox" id="hideBoundingBoxesCheckbox" onchange="onChangeHideBoundingBoxes(event)" />
+        <label for="hideBoundingBoxesCheckbox">Hide Bounding Boxes</label>
+      </div>
+    </div>
+    <div class="scrollable-box">
+      <h5>Landmark Points</h5>
+      <div id="landmarkData" class="scrollable-content"></div>
+    </div>
+  </div>
+  <script>
+    let withBoxes = true;
+
+    function onChangeHideBoundingBoxes(e) {
+      withBoxes = !$(e.target).prop('checked');
+      updateResults();
+    }
+
+    async function updateResults() {
+      if (!isFaceDetectionModelLoaded()) {
+        return;
+      }
+
+      const inputImgEl = $('#inputImg').get(0);
+      const options = getFaceDetectorOptions();
+
+      const results = await faceapi.detectAllFaces(inputImgEl, options).withFaceLandmarks();
+
+      const canvas = $('#overlay').get(0);
+      faceapi.matchDimensions(canvas, inputImgEl);
+      const resizedResults = faceapi.resizeResults(results, inputImgEl);
+
+      if (withBoxes) {
+        faceapi.draw.drawDetections(canvas, resizedResults);
+      }
+      faceapi.draw.drawFaceLandmarks(canvas, resizedResults);
+
+      displayLandmarks(resizedResults);
+    }
+
+    function displayLandmarks(results) {
+      const container = $('#landmarkData');
+      container.empty();
+
+      results.forEach((result, index) => {
+        const landmarks = result.landmarks;
+
+        container.append(`<h6>Face ${index + 1}</h6>`);
+
+        const categories = [
+          { name: 'Jaw Outline', points: landmarks.getJawOutline() },
+          { name: 'Left Eye', points: landmarks.getLeftEye() },
+          { name: 'Right Eye', points: landmarks.getRightEye() },
+          { name: 'Nose', points: landmarks.getNose() },
+          { name: 'Mouth', points: landmarks.getMouth() },
+          { name: 'Eyebrows (Left)', points: landmarks.getLeftEyeBrow() },
+          { name: 'Eyebrows (Right)', points: landmarks.getRightEyeBrow() }
+        ];
+
+        categories.forEach(category => {
+          container.append(`<h6>${category.name}</h6>`);
+          category.points.forEach((point, idx) => {
+            container.append(`<p>Point ${idx + 1}: (${point.x.toFixed(2)}, ${point.y.toFixed(2)})</p>`);
+          });
+        });
+      });
+    }
+
+    async function run() {
+      await changeFaceDetector(SSD_MOBILENETV1);
+      await faceapi.loadFaceLandmarkModel('/');
+
+      updateResults();
+    }
+
+    $(document).ready(function() {
+      renderNavBar('#navbar', 'face_landmark_detection');
+      initImageSelectionControls();
+      initFaceDetectionControls();
+      run();
+    });
   </script>
 </body>
 </html>

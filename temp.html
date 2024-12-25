@@ -1,0 +1,258 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Detection and Landmark Movements</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <style>
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #coordinatesBox {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            overflow-y: scroll;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay></video>
+    <canvas id="output"></canvas>
+    <div id="coordinatesBox"></div>
+
+    <script>
+        const videoElement = document.getElementById('video');
+        const canvasElement = document.getElementById('output');
+        const canvasCtx = canvasElement.getContext('2d');
+        const coordinatesBox = document.getElementById('coordinatesBox');
+
+        const faceMesh = new FaceMesh({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+        });
+        faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+        });
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await faceMesh.send({ image: videoElement });
+            },
+            width: 1280,
+            height: 720,
+        });
+        camera.start();
+
+        function categorizeLandmarks(landmarks) {
+            const categories = {
+                lips: [],
+                cheeks: [],
+                nose: [],
+                eyes: [],
+                faceOutline: [],
+            };
+
+            landmarks.forEach((point, index) => {
+                if (index >= 0 && index <= 13) categories.lips.push(point);
+                else if (index >= 234 && index <= 454) categories.cheeks.push(point);
+                else if (index >= 1 && index <= 9) categories.nose.push(point);
+                else if (index >= 33 && index <= 133) categories.eyes.push(point);
+                else categories.faceOutline.push(point);
+            });
+
+            return categories;
+        }
+
+        faceMesh.onResults((results) => {
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+
+            if (results.multiFaceLandmarks) {
+                coordinatesBox.innerHTML = '';
+                results.multiFaceLandmarks.forEach((landmarks) => {
+                    const categories = categorizeLandmarks(landmarks);
+                    Object.keys(categories).forEach((category) => {
+                        const categoryData = categories[category];
+                        const categoryTitle = `<strong>${category.toUpperCase()}</strong>`;
+                        const points = categoryData
+                            .map((point, i) => `Point ${i}: (${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)})`)
+                            .join('<br>');
+                        coordinatesBox.innerHTML += `${categoryTitle}<br>${points}<br><br>`;
+                    });
+
+                    landmarks.forEach((point) => {
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(point.x * canvasElement.width, point.y * canvasElement.height, 2, 0, 2 * Math.PI);
+                        canvasCtx.fillStyle = 'red';
+                        canvasCtx.fill();
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Landmark Detection with Movements</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <style>
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #coordinatesBox {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            overflow-y: scroll;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay></video>
+    <canvas id="output"></canvas>
+    <div id="coordinatesBox"></div>
+
+    <script>
+        const videoElement = document.getElementById('video');
+        const canvasElement = document.getElementById('output');
+        const canvasCtx = canvasElement.getContext('2d');
+        const coordinatesBox = document.getElementById('coordinatesBox');
+
+        const faceMesh = new FaceMesh({
+            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+        });
+        faceMesh.setOptions({
+            maxNumFaces: 1,
+            refineLandmarks: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+        });
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await faceMesh.send({ image: videoElement });
+            },
+            width: 1280,
+            height: 720,
+        });
+        camera.start();
+
+        function calculateMovements(landmarks) {
+            // Eyelids: Top and bottom landmarks for left and right eyes
+            const leftUpperEyelid = landmarks[386];
+            const leftLowerEyelid = landmarks[374];
+            const rightUpperEyelid = landmarks[159];
+            const rightLowerEyelid = landmarks[145];
+
+            // Eyeballs: Center points for left and right eyes
+            const leftEyeballCenter = landmarks[468];
+            const rightEyeballCenter = landmarks[473];
+
+            // Eyelid Movements: Vertical distance between upper and lower eyelids
+            const leftEyelidDistance = Math.abs(leftUpperEyelid.y - leftLowerEyelid.y);
+            const rightEyelidDistance = Math.abs(rightUpperEyelid.y - rightLowerEyelid.y);
+
+            // Eyeball Movements: Horizontal coordinate
+            const leftEyeballHorizontal = leftEyeballCenter.x;
+            const rightEyeballHorizontal = rightEyeballCenter.x;
+
+            return {
+                eyelids: {
+                    leftDistance: leftEyelidDistance,
+                    rightDistance: rightEyelidDistance,
+                },
+                eyeballs: {
+                    leftHorizontal: leftEyeballHorizontal,
+                    rightHorizontal: rightEyeballHorizontal,
+                },
+            };
+        }
+
+        function categorizeLandmarks(landmarks) {
+            const categories = {
+                //lips: [],
+                //cheeks: [],
+                //nose: [],
+                eyelids: [],
+                eyeballs: [],
+            };
+
+            landmarks.forEach((point, index) => {
+              //  if (index >= 61 && index <= 76) categories.lips.push(point);
+                //else if (index >= 234 && index <= 454) categories.cheeks.push(point);
+               // else if (index >= 1 && index <= 9) categories.nose.push(point);
+                 if ([386, 374, 159, 145].includes(index)) categories.eyelids.push(point);
+                else if ([468, 473].includes(index)) categories.eyeballs.push(point);
+            });
+
+            return categories;
+        }
+
+        faceMesh.onResults((results) => {
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasElement.width = videoElement.videoWidth;
+            canvasElement.height = videoElement.videoHeight;
+
+            if (results.multiFaceLandmarks) {
+                coordinatesBox.innerHTML = '';
+                results.multiFaceLandmarks.forEach((landmarks) => {
+                    const movements = calculateMovements(landmarks);
+                    const categories = categorizeLandmarks(landmarks);
+
+                    coordinatesBox.innerHTML += `
+                        <strong>Eyelid Movements:</strong><br>
+                        Left Distance: ${movements.eyelids.leftDistance.toFixed(4)}<br>
+                        Right Distance: ${movements.eyelids.rightDistance.toFixed(4)}<br><br>
+                        <strong>Eyeball Movements:</strong><br>
+                        Left Horizontal: ${movements.eyeballs.leftHorizontal.toFixed(4)}<br>
+                        Right Horizontal: ${movements.eyeballs.rightHorizontal.toFixed(4)}<br><br>
+                    `;
+
+                    Object.keys(categories).forEach((category) => {
+                        const categoryData = categories[category];
+                        const categoryTitle = `<strong>${category.toUpperCase()}</strong>`;
+                        const points = categoryData
+                            .map((point, i) => `Point ${i}: (${point.x.toFixed(2)}, ${point.y.toFixed(2)}, ${point.z.toFixed(2)})`)
+                            .join('<br>');
+                        coordinatesBox.innerHTML += `${categoryTitle}<br>${points}<br><br>`;
+                    });
+
+                    landmarks.forEach((point) => {
+                        canvasCtx.beginPath();
+                        canvasCtx.arc(point.x * canvasElement.width, point.y * canvasElement.height, 2, 0, 2 * Math.PI);
+                        canvasCtx.fillStyle = 'red';
+                        canvasCtx.fill();
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

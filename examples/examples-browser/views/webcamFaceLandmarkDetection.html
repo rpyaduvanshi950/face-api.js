@@ -1,5 +1,6 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
+
 <head>
   <script src="face-api.js"></script>
   <script src="js/commons.js"></script>
@@ -9,6 +10,7 @@
   <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
 </head>
+
 <body>
   <div id="navbar"></div>
   <div class="center-content page-container">
@@ -23,7 +25,6 @@
 
     <div class="row side-by-side">
 
-      <!-- face_detector_selection_control -->
       <div id="face_detector_selection_control" class="row input-field" style="margin-right: 20px;">
         <select id="selectFaceDetector">
           <option value="ssd_mobilenetv1">SSD Mobilenet V1</option>
@@ -31,16 +32,10 @@
         </select>
         <label>Select Face Detector</label>
       </div>
-      <!-- face_detector_selection_control -->
-
-      <!-- check boxes -->
       <div class="row" style="width: 220px;">
         <input type="checkbox" id="hideBoundingBoxesCheckbox" onchange="onChangeHideBoundingBoxes(event)" />
         <label for="hideBoundingBoxesCheckbox">Hide Bounding Boxes</label>
       </div>
-      <!-- check boxes -->
-
-      <!-- fps_meter -->
       <div id="fps_meter" class="row side-by-side">
         <div>
           <label for="time">Time:</label>
@@ -49,35 +44,29 @@
           <input disabled value="-" id="fps" type="text" class="bold">
         </div>
       </div>
-      <!-- fps_meter -->
+      <!-- fps_meter 
 
     </div>
 
 
-    <!-- ssd_mobilenetv1_controls -->
+    <!-- ssd_mobilenetv1_controls 
     <span id="ssd_mobilenetv1_controls">
       <div class="row side-by-side">
         <div class="row">
           <label for="minConfidence">Min Confidence:</label>
           <input disabled value="0.5" id="minConfidence" type="text" class="bold">
         </div>
-        <button
-          class="waves-effect waves-light btn"
-          onclick="onDecreaseMinConfidence()"
-        >
+        <button class="waves-effect waves-light btn" onclick="onDecreaseMinConfidence()">
           <i class="material-icons left">-</i>
         </button>
-        <button
-          class="waves-effect waves-light btn"
-          onclick="onIncreaseMinConfidence()"
-        >
+        <button class="waves-effect waves-light btn" onclick="onIncreaseMinConfidence()">
           <i class="material-icons left">+</i>
         </button>
       </div>
     </span>
-    <!-- ssd_mobilenetv1_controls -->
+    <!-- ssd_mobilenetv1_controls 
 
-    <!-- tiny_face_detector_controls -->
+    <!-- tiny_face_detector_controls 
     <span id="tiny_face_detector_controls">
       <div class="row side-by-side">
         <div class="row input-field" style="margin-right: 20px;">
@@ -97,88 +86,879 @@
           <label for="scoreThreshold">Score Threshold:</label>
           <input disabled value="0.5" id="scoreThreshold" type="text" class="bold">
         </div>
-        <button
-          class="waves-effect waves-light btn"
-          onclick="onDecreaseScoreThreshold()"
-        >
+        <button class="waves-effect waves-light btn" onclick="onDecreaseScoreThreshold()">
           <i class="material-icons left">-</i>
         </button>
-        <button
-          class="waves-effect waves-light btn"
-          onclick="onIncreaseScoreThreshold()"
-        >
+        <button class="waves-effect waves-light btn" onclick="onIncreaseScoreThreshold()">
           <i class="material-icons left">+</i>
         </button>
       </div>
     </span>
-    <!-- tiny_face_detector_controls -->
+    <!-- tiny_face_detector_controls 
+    <div class="row" style="position: fixed; right:0; top:100px;">
+      <div id="landmarksBox"
+        style="width: 300px; height: 500px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;">
+        <h5>Landmark Coordinates</h5>
+        <ul id="landmarkCoordinates"></ul>
+      </div>
+    </div>
 
+
+</body>
+
+<script>
+  let forwardTimes = []
+  let withBoxes = true
+
+  function onChangeHideBoundingBoxes(e) {
+    withBoxes = !$(e.target).prop('checked')
+  }
+
+  function updateTimeStats(timeInMs) {
+    forwardTimes = [timeInMs].concat(forwardTimes).slice(0, 30)
+    const avgTimeInMs = forwardTimes.reduce((total, t) => total + t) / forwardTimes.length
+    $('#time').val(`${Math.round(avgTimeInMs)} ms`)
+    $('#fps').val(`${faceapi.utils.round(1000 / avgTimeInMs)}`)
+  }
+
+  async function onPlay() {
+    const videoEl = $('#inputVideo').get(0)
+
+    if (videoEl.paused || videoEl.ended || !isFaceDetectionModelLoaded())
+      return setTimeout(() => onPlay())
+
+
+    const options = getFaceDetectorOptions()
+
+    const ts = Date.now()
+
+    const result = await faceapi.detectSingleFace(videoEl, options).withFaceLandmarks()
+
+    updateTimeStats(Date.now() - ts)
+
+    if (result) {
+      const canvas = $('#overlay').get(0)
+      const dims = faceapi.matchDimensions(canvas, videoEl, true)
+      const resizedResult = faceapi.resizeResults(result, dims)
+
+      if (withBoxes) {
+        faceapi.draw.drawDetections(canvas, resizedResult)
+      }
+      faceapi.draw.drawFaceLandmarks(canvas, resizedResult)
+    }
+
+    setTimeout(() => onPlay())
+  }
+
+  async function run() {
+    // load face detection and face landmark models
+    await changeFaceDetector(TINY_FACE_DETECTOR)
+    await faceapi.loadFaceLandmarkModel('/')
+    changeInputSize(224)
+
+    // try to access users webcam and stream the images
+    // to the video element
+    const stream = await navigator.mediaDevices.getUserMedia({ video: {} })
+    const videoEl = $('#inputVideo').get(0)
+    videoEl.srcObject = stream
+  }
+
+  function updateResults() { }
+
+  $(document).ready(function () {
+    renderNavBar('#navbar', 'webcam_face_landmark_detection')
+    initFaceDetectionControls()
+    run()
+  })
+  function displayLandmarkCoordinates(landmarks) {
+    const landmarkCoordinates = $('#landmarkCoordinates');
+    landmarkCoordinates.empty(); // Clear previous data
+
+    if (landmarks) {
+      const categorized = landmarks.positions.map((pos, index) => `Point ${index + 1}: (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)})`);
+      categorized.forEach(coord => {
+        landmarkCoordinates.append(`<li>${coord}</li>`);
+      });
+    }
+  }
+
+  async function onPlay() {
+    const videoEl = $('#inputVideo').get(0);
+
+    if (videoEl.paused || videoEl.ended || !isFaceDetectionModelLoaded())
+      return setTimeout(() => onPlay());
+
+    const options = getFaceDetectorOptions();
+    const ts = Date.now();
+
+    const result = await faceapi.detectSingleFace(videoEl, options).withFaceLandmarks();
+
+    updateTimeStats(Date.now() - ts);
+
+    if (result) {
+      const canvas = $('#overlay').get(0);
+      const dims = faceapi.matchDimensions(canvas, videoEl, true);
+      const resizedResult = faceapi.resizeResults(result, dims);
+
+      if (withBoxes) {
+        faceapi.draw.drawDetections(canvas, resizedResult);
+      }
+      faceapi.draw.drawFaceLandmarks(canvas, resizedResult);
+
+      // Extract and display landmark coordinates
+      if (result.landmarks) {
+        displayLandmarkCoordinates(result.landmarks);
+      }
+    }
+
+    setTimeout(() => onPlay());
+  }
+
+</script>
+</body>
+
+</html> -->
+
+<!-- <!DOCTYPE html>
+<html>
+
+<head>
+  <script src="face-api.js"></script>
+  <script src="js/commons.js"></script>
+  <script src="js/faceDetectionControls.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+  <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+</head>
+
+<body>
+  <div id="navbar"></div>
+  <div class="center-content page-container">
+
+    <div class="progress" id="loader">
+      <div class="indeterminate"></div>
+    </div>
+    <div style="position: relative" class="margin">
+      <video onloadedmetadata="onPlay(this)" id="inputVideo" autoplay muted playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
+    <div class="row side-by-side">
+
+      <div id="face_detector_selection_control" class="row input-field" style="margin-right: 20px;">
+        <select id="selectFaceDetector">
+          <option value="ssd_mobilenetv1">SSD Mobilenet V1</option>
+          <option value="tiny_face_detector">Tiny Face Detector</option>
+        </select>
+        <label>Select Face Detector</label>
+      </div>
+
+      <div class="row" style="width: 220px;">
+        <input type="checkbox" id="hideBoundingBoxesCheckbox" onchange="onChangeHideBoundingBoxes(event)" />
+        <label for="hideBoundingBoxesCheckbox">Hide Bounding Boxes</label>
+      </div>
+
+      <div id="fps_meter" class="row side-by-side">
+        <div>
+          <label for="time">Time:</label>
+          <input disabled value="-" id="time" type="text" class="bold">
+          <label for="fps">Estimated Fps:</label>
+          <input disabled value="-" id="fps" type="text" class="bold">
+        </div>
+      </div>
+
+    </div>
+
+    <span id="ssd_mobilenetv1_controls">
+      <div class="row side-by-side">
+        <div class="row">
+          <label for="minConfidence">Min Confidence:</label>
+          <input disabled value="0.5" id="minConfidence" type="text" class="bold">
+        </div>
+        <button class="waves-effect waves-light btn" onclick="onDecreaseMinConfidence()">
+          <i class="material-icons left">-</i>
+        </button>
+        <button class="waves-effect waves-light btn" onclick="onIncreaseMinConfidence()">
+          <i class="material-icons left">+</i>
+        </button>
+      </div>
+    </span>
+
+    <span id="tiny_face_detector_controls">
+      <div class="row side-by-side">
+        <div class="row input-field" style="margin-right: 20px;">
+          <select id="inputSize">
+            <option value="" disabled selected>Input Size:</option>
+            <option value="128">128 x 128</option>
+            <option value="160">160 x 160</option>
+            <option value="224">224 x 224</option>
+            <option value="320">320 x 320</option>
+            <option value="416">416 x 416</option>
+            <option value="512">512 x 512</option>
+            <option value="608">608 x 608</option>
+          </select>
+          <label>Input Size</label>
+        </div>
+        <div class="row">
+          <label for="scoreThreshold">Score Threshold:</label>
+          <input disabled value="0.5" id="scoreThreshold" type="text" class="bold">
+        </div>
+        <button class="waves-effect waves-light btn" onclick="onDecreaseScoreThreshold()">
+          <i class="material-icons left">-</i>
+        </button>
+        <button class="waves-effect waves-light btn" onclick="onIncreaseScoreThreshold()">
+          <i class="material-icons left">+</i>
+        </button>
+      </div>
+    </span>
+
+    <div class="row" style="position: fixed; right:0; top:100px;">
+      <div id="landmarksBox" style="width: 300px; height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;">
+        <h5>Landmark Coordinates</h5>
+        <ul id="landmarkCoordinates"></ul>
+      </div>
+    </div>
+    <div class="row" style="position: fixed; right: 0; top: 500px;">
+      <div id="movementBox" style="width: 300px; height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;">
+        <h5>Movement Details</h5>
+        <ul id="movementDetails"></ul>
+      </div>
+    </div>
+    
+</body>
+<script>
+  let forwardTimes = [];
+  let withBoxes = true;
+
+  const categories = {
+    "Jawline": Array.from({ length: 17 }, (_, i) => i),
+    "Right Eyebrow": [17, 18, 19, 20, 21],
+    "Left Eyebrow": [22, 23, 24, 25, 26],
+    "Nose Bridge": [27, 28, 29, 30],
+    "Nose": [31, 32, 33, 34, 35],
+    "Right Eye": [36, 37, 38, 39, 40, 41],
+    "Left Eye": [42, 43, 44, 45, 46, 47],
+    "Mouth Outer": [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59],
+    "Mouth Inner": [60, 61, 62, 63, 64, 65, 66, 67]
+  };
+
+  function onChangeHideBoundingBoxes(e) {
+    withBoxes = !$(e.target).prop('checked');
+  }
+
+  function updateTimeStats(timeInMs) {
+    forwardTimes = [timeInMs].concat(forwardTimes).slice(0, 30);
+    const avgTimeInMs = forwardTimes.reduce((total, t) => total + t) / forwardTimes.length;
+    $('#time').val(`${Math.round(avgTimeInMs)} ms`);
+    $('#fps').val(`${faceapi.utils.round(1000 / avgTimeInMs)}`);
+  }
+
+  function displayLandmarkCoordinates(landmarks) {
+    const landmarkCoordinates = $('#landmarkCoordinates');
+    landmarkCoordinates.empty();
+
+    if (landmarks) {
+      Object.entries(categories).forEach(([category, indices]) => {
+        landmarkCoordinates.append(`<li><strong>${category}:</strong></li>`);
+        indices.forEach(index => {
+          const pos = landmarks.positions[index];
+          landmarkCoordinates.append(`<li>Point ${index + 1}: (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)})</li>`);
+        });
+      });
+    }
+  }
+
+  let prevLandmarks = null;
+let startTime = null; // Timer to track the duration of below-threshold movement
+
+function calculateMovement(currentLandmarks) {
+  const movementDetails = $('#movementDetails');
+  movementDetails.empty();
+
+  if (!prevLandmarks) {
+    prevLandmarks = currentLandmarks.positions;
+    return;
+  }
+
+  const threshold = 2; // Movement threshold
+  const requiredDuration = 3000; // 3 seconds in milliseconds
+  let belowThresholdCount = 0; // Counter for categories below the threshold
+
+  const movements = Object.entries(categories).map(([category, indices]) => {
+    let totalMovement = 0;
+
+    indices.forEach(index => {
+      const prevPos = prevLandmarks[index];
+      const currentPos = currentLandmarks.positions[index];
+
+      // Calculate Euclidean distance between the current and previous points
+      const distance = Math.sqrt(
+        Math.pow(currentPos.x - prevPos.x, 2) +
+        Math.pow(currentPos.y - prevPos.y, 2)
+      );
+
+      totalMovement += distance;
+    });
+
+    const averageMovement = totalMovement / indices.length;
+
+    // Check if this category is below the threshold
+    if (averageMovement < threshold) {
+      belowThresholdCount++;
+    }
+
+    return { category, movement: averageMovement.toFixed(2) };
+  });
+
+  movements.forEach(({ category, movement }) => {
+    movementDetails.append(`<li><strong>${category}:</strong> ${movement} px</li>`);
+  });
+
+  // Check if more than half of the categories are below the threshold
+  if (belowThresholdCount > Object.keys(categories).length / 2) {
+    if (!startTime) {
+      startTime = Date.now(); // Start the timer
+    } else if (Date.now() - startTime >= requiredDuration) {
+      alert('More than half of the categories have movement below the threshold of 2px for the last 3 seconds!');
+      startTime = null; // Reset after alert
+    }
+  } else {
+    startTime = null; // Reset if condition is not met
+  }
+
+  prevLandmarks = currentLandmarks.positions;
+}
+
+
+  async function onPlay() {
+    const videoEl = $('#inputVideo').get(0);
+
+    if (videoEl.paused || videoEl.ended || !isFaceDetectionModelLoaded())
+      return setTimeout(() => onPlay());
+
+    const options = getFaceDetectorOptions();
+    const ts = Date.now();
+
+    const result = await faceapi.detectSingleFace(videoEl, options).withFaceLandmarks();
+
+    updateTimeStats(Date.now() - ts);
+
+    if (result) {
+      const canvas = $('#overlay').get(0);
+      const dims = faceapi.matchDimensions(canvas, videoEl, true);
+      const resizedResult = faceapi.resizeResults(result, dims);
+
+      if (withBoxes) {
+        faceapi.draw.drawDetections(canvas, resizedResult);
+      }
+      faceapi.draw.drawFaceLandmarks(canvas, resizedResult);
+
+      if (result.landmarks) {
+        displayLandmarkCoordinates(result.landmarks);
+        calculateMovement(result.landmarks);
+      }
+    }
+
+    setTimeout(() => onPlay());
+  }
+
+  async function run() {
+    await changeFaceDetector(TINY_FACE_DETECTOR);
+    await faceapi.loadFaceLandmarkModel('/');
+    changeInputSize(224);
+
+    const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+    const videoEl = $('#inputVideo').get(0);
+    videoEl.srcObject = stream;
+  }
+
+  $(document).ready(function () {
+    renderNavBar('#navbar', 'webcam_face_landmark_detection');
+    initFaceDetectionControls();
+    run();
+  });
+</script>
+</html> -->
+
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="face-api.js"></script>
+  <script src="js/commons.js"></script>
+  <script src="js/faceDetectionControls.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/css/materialize.css">
+  <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.100.2/js/materialize.min.js"></script>
+</head>
+
+<body>
+  <div id="navbar"></div>
+  <div class="center-content page-container">
+
+    <div class="progress" id="loader">
+      <div class="indeterminate"></div>
+    </div>
+    <div style="position: relative" class="margin">
+      <video onloadedmetadata="onPlay(this)" id="inputVideo" autoplay muted playsinline></video>
+      <canvas id="overlay"></canvas>
+    </div>
+    <div class="row side-by-side">
+      <div id="face_detector_selection_control" class="row input-field" style="margin-right: 20px;">
+        <select id="selectFaceDetector">
+          <option value="ssd_mobilenetv1">SSD Mobilenet V1</option>
+          <option value="tiny_face_detector">Tiny Face Detector</option>
+        </select>
+        <label>Select Face Detector</label>
+      </div>
+
+      <div class="row" style="width: 220px;">
+        <input type="checkbox" id="hideBoundingBoxesCheckbox" onchange="onChangeHideBoundingBoxes(event)" />
+        <label for="hideBoundingBoxesCheckbox">Hide Bounding Boxes</label>
+      </div>
+
+      <div id="fps_meter" class="row side-by-side">
+        <div>
+          <label for="time">Time:</label>
+          <input disabled value="-" id="time" type="text" class="bold">
+          <label for="fps">Estimated Fps:</label>
+          <input disabled value="-" id="fps" type="text" class="bold">
+        </div>
+      </div>
+    </div>
+
+    <span id="ssd_mobilenetv1_controls">
+      <div class="row side-by-side">
+        <div class="row">
+          <label for="minConfidence">Min Confidence:</label>
+          <input disabled value="0.5" id="minConfidence" type="text" class="bold">
+        </div>
+        <button class="waves-effect waves-light btn" onclick="onDecreaseMinConfidence()">
+          <i class="material-icons left">-</i>
+        </button>
+        <button class="waves-effect waves-light btn" onclick="onIncreaseMinConfidence()">
+          <i class="material-icons left">+</i>
+        </button>
+      </div>
+    </span>
+
+    <span id="tiny_face_detector_controls">
+      <div class="row side-by-side">
+        <div class="row input-field" style="margin-right: 20px;">
+          <select id="inputSize">
+            <option value="" disabled selected>Input Size:</option>
+            <option value="128">128 x 128</option>
+            <option value="160">160 x 160</option>
+            <option value="224">224 x 224</option>
+            <option value="320">320 x 320</option>
+            <option value="416">416 x 416</option>
+            <option value="512">512 x 512</option>
+            <option value="608">608 x 608</option>
+          </select>
+          <label>Input Size</label>
+        </div>
+        <div class="row">
+          <label for="scoreThreshold">Score Threshold:</label>
+          <input disabled value="0.5" id="scoreThreshold" type="text" class="bold">
+        </div>
+        <button class="waves-effect waves-light btn" onclick="onDecreaseScoreThreshold()">
+          <i class="material-icons left">-</i>
+        </button>
+        <button class="waves-effect waves-light btn" onclick="onIncreaseScoreThreshold()">
+          <i class="material-icons left">+</i>
+        </button>
+      </div>
+    </span>
+
+    <div class="row" style="position: fixed; right:0; top:100px;">
+      <div id="landmarksBox" style="width: 300px; height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;">
+        <h5>Landmark Coordinates</h5>
+        <ul id="landmarkCoordinates"></ul>
+      </div>
+    </div>
+    <div class="row" style="position: fixed; right: 0; top: 500px;">
+      <div id="movementBox" style="width: 300px; height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px;">
+        <h5>Movement Details</h5>
+        <ul id="movementDetails"></ul>
+      </div>
+    </div>
+    
   </body>
-
   <script>
-    let forwardTimes = []
-    let withBoxes = true
+    let forwardTimes = [];
+    let withBoxes = true;
+
+    const categories = {
+      "Jawline": Array.from({ length: 17 }, (_, i) => i),
+      "Right Eyebrow": [17, 18, 19, 20, 21],
+      "Left Eyebrow": [22, 23, 24, 25, 26],
+      "Nose Bridge": [27, 28, 29, 30],
+      "Nose": [31, 32, 33, 34, 35],
+      "Right Eye": [36, 37, 38, 39, 40, 41],
+      "Left Eye": [42, 43, 44, 45, 46, 47],
+      "Mouth Outer": [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59],
+      "Mouth Inner": [60, 61, 62, 63, 64, 65, 66, 67]
+    };
 
     function onChangeHideBoundingBoxes(e) {
-      withBoxes = !$(e.target).prop('checked')
+      withBoxes = !$(e.target).prop('checked');
     }
 
     function updateTimeStats(timeInMs) {
-      forwardTimes = [timeInMs].concat(forwardTimes).slice(0, 30)
-      const avgTimeInMs = forwardTimes.reduce((total, t) => total + t) / forwardTimes.length
-      $('#time').val(`${Math.round(avgTimeInMs)} ms`)
-      $('#fps').val(`${faceapi.utils.round(1000 / avgTimeInMs)}`)
+      forwardTimes = [timeInMs].concat(forwardTimes).slice(0, 30);
+      const avgTimeInMs = forwardTimes.reduce((total, t) => total + t) / forwardTimes.length;
+      $('#time').val(`${Math.round(avgTimeInMs)} ms`);
+      $('#fps').val(`${faceapi.utils.round(1000 / avgTimeInMs)}`);
+    }
+
+    function displayLandmarkCoordinates(landmarks) {
+      const landmarkCoordinates = $('#landmarkCoordinates');
+      landmarkCoordinates.empty();
+
+      if (landmarks) {
+        Object.entries(categories).forEach(([category, indices]) => {
+          landmarkCoordinates.append(`<li><strong>${category}:</strong></li>`);
+          indices.forEach(index => {
+            const pos = landmarks.positions[index];
+            landmarkCoordinates.append(`<li>Point ${index + 1}: (${pos.x.toFixed(2)}, ${pos.y.toFixed(2)})</li>`);
+          });
+        });
+      }
+    }
+
+    let prevLandmarks = null;
+    let startTime = null; // Timer to track the duration of below-threshold movement
+
+    function calculateMovement(currentLandmarks) {
+      const movementDetails = $('#movementDetails');
+      movementDetails.empty();
+
+      if (!prevLandmarks) {
+        prevLandmarks = currentLandmarks.positions;
+        return;
+      }
+
+      const threshold = 2; // Movement threshold
+      const requiredDuration = 3000; // 3 seconds in milliseconds
+      let belowThresholdCount = 0; // Counter for categories below the threshold
+
+      const movements = Object.entries(categories).map(([category, indices]) => {
+        let totalMovement = 0;
+
+        indices.forEach(index => {
+          const prevPos = prevLandmarks[index];
+          const currentPos = currentLandmarks.positions[index];
+
+          // Calculate Euclidean distance between the current and previous points
+          const distance = Math.sqrt(
+            Math.pow(currentPos.x - prevPos.x, 2) +
+            Math.pow(currentPos.y - prevPos.y, 2)
+          );
+
+          totalMovement += distance;
+        });
+
+        const averageMovement = totalMovement / indices.length;
+
+        // Check if this category is below the threshold
+        if (averageMovement < threshold) {
+          belowThresholdCount++;
+        }
+
+        return { category, movement: averageMovement.toFixed(2) };
+      });
+
+      movements.forEach(({ category, movement }) => {
+        movementDetails.append(`<li><strong>${category}:</strong> ${movement} px</li>`);
+      });
+
+      // Check if more than half of the categories are below the threshold
+      if (belowThresholdCount > Object.keys(categories).length / 2) {
+        if (!startTime) {
+          startTime = Date.now(); // Start the timer
+        } else if (Date.now() - startTime >= requiredDuration) {
+          alert('More than half of the categories have movement below the threshold of 2px for the last 3 seconds!');
+          startTime = null; // Reset after alert
+        }
+      } else {
+        startTime = null; // Reset if condition is not met
+      }
+
+      prevLandmarks = currentLandmarks.positions;
     }
 
     async function onPlay() {
-      const videoEl = $('#inputVideo').get(0)
+      const videoEl = $('#inputVideo').get(0);
 
-      if(videoEl.paused || videoEl.ended || !isFaceDetectionModelLoaded())
-        return setTimeout(() => onPlay())
+      if (videoEl.paused || videoEl.ended || !isFaceDetectionModelLoaded())
+        return setTimeout(() => onPlay());
 
+      const options = getFaceDetectorOptions();
+      const ts = Date.now();
 
-      const options = getFaceDetectorOptions()
+      const result = await faceapi.detectSingleFace(videoEl, options)
+                         .withFaceLandmarks()
+                         .withFaceExpressions(); // Added face expression detection
 
-      const ts = Date.now()
-
-      const result = await faceapi.detectSingleFace(videoEl, options).withFaceLandmarks()
-
-      updateTimeStats(Date.now() - ts)
+      updateTimeStats(Date.now() - ts);
 
       if (result) {
-        const canvas = $('#overlay').get(0)
-        const dims = faceapi.matchDimensions(canvas, videoEl, true)
-        const resizedResult = faceapi.resizeResults(result, dims)
+        const canvas = $('#overlay').get(0);
+        const dims = faceapi.matchDimensions(canvas, videoEl, true);
+        const resizedResult = faceapi.resizeResults(result, dims);
 
         if (withBoxes) {
-          faceapi.draw.drawDetections(canvas, resizedResult)
+          faceapi.draw.drawDetections(canvas, resizedResult);
         }
-        faceapi.draw.drawFaceLandmarks(canvas, resizedResult)
+        faceapi.draw.drawFaceLandmarks(canvas, resizedResult);
+
+        if (result.landmarks) {
+          displayLandmarkCoordinates(result.landmarks);
+          calculateMovement(result.landmarks);
+        }
+
+        // Draw expressions on the canvas
+        faceapi.draw.drawFaceExpressions(canvas, resizedResult);
       }
 
-      setTimeout(() => onPlay())
+      setTimeout(() => onPlay());
     }
 
     async function run() {
-      // load face detection and face landmark models
-      await changeFaceDetector(TINY_FACE_DETECTOR)
-      await faceapi.loadFaceLandmarkModel('/')
-      changeInputSize(224)
+      await changeFaceDetector(TINY_FACE_DETECTOR);
+      await faceapi.loadFaceLandmarkModel('/');
+      await faceapi.loadFaceExpressionModel('/'); // Load face expression model
+      changeInputSize(224);
 
-      // try to access users webcam and stream the images
-      // to the video element
-      const stream = await navigator.mediaDevices.getUserMedia({ video: {} })
-      const videoEl = $('#inputVideo').get(0)
-      videoEl.srcObject = stream
+      const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+      const videoEl = $('#inputVideo').get(0);
+      videoEl.srcObject = stream;
     }
 
-    function updateResults() {}
-
-    $(document).ready(function() {
-      renderNavBar('#navbar', 'webcam_face_landmark_detection')
-      initFaceDetectionControls()
-      run()
-    })
+    $(document).ready(function () {
+      renderNavBar('#navbar', 'webcam_face_landmark_detection');
+      initFaceDetectionControls();
+      run();
+    });
   </script>
-</body>
 </html>
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face Landmark Detection</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+    
+    .container {
+      position: relative;
+      width: 640px;
+      height: 480px;
+    }
+    
+    .input-video,
+    .output-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    .controls {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    button {
+      padding: 8px 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    button:hover {
+      background-color: #0056b3;
+    }
+    
+    #fpsDisplay {
+      font-size: 14px;
+      color: #333;
+    }
+    
+  </style>
+</head>
+<body>
+  <div class="container">
+    <video class="input-video" autoplay playsinline muted></video>
+    <canvas class="output-canvas"></canvas>
+    <div class="controls">
+      <button id="toggleBoundingBox">Toggle Bounding Box</button>
+      <span id="fpsDisplay">FPS: 0</span>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+</body>
+<script>
+  const videoElement = document.querySelector('.input-video');
+  const canvasElement = document.querySelector('.output-canvas');
+  const canvasCtx = canvasElement.getContext('2d');
+  const toggleBoundingBoxButton = document.getElementById('toggleBoundingBox');
+  const fpsDisplay = document.getElementById('fpsDisplay');
+  
+  let showBoundingBox = true;
+  let lastTimestamp = 0;
+  let previousPositions = {}; // Store previous positions for movement calculation
+  
+  // Initialize Mediapipe FaceMesh
+  const faceMesh = new FaceMesh({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+  });
+  faceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: true,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+  
+  // Handle toggle bounding box button
+  toggleBoundingBoxButton.addEventListener('click', () => {
+    showBoundingBox = !showBoundingBox;
+  });
+  
+  // Process face landmarks
+  faceMesh.onResults((results) => {
+    const now = performance.now();
+    const fps = 1000 / (now - lastTimestamp);
+    lastTimestamp = now;
+    fpsDisplay.textContent = `FPS: ${fps.toFixed(1)}`;
+  
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  
+    // Draw landmarks and analyze expressions/movements
+    if (results.multiFaceLandmarks) {
+      for (const landmarks of results.multiFaceLandmarks) {
+        if (showBoundingBox) {
+          drawBoundingBox(landmarks);
+        }
+        drawLandmarks(landmarks);
+        detectExpression(landmarks);
+        calculateMovement(landmarks);
+      }
+    }
+  });
+  
+  // Draw bounding box
+  function drawBoundingBox(landmarks) {
+    const xs = landmarks.map((point) => point.x * canvasElement.width);
+    const ys = landmarks.map((point) => point.y * canvasElement.height);
+    const xMin = Math.min(...xs);
+    const yMin = Math.min(...ys);
+    const xMax = Math.max(...xs);
+    const yMax = Math.max(...ys);
+  
+    canvasCtx.strokeStyle = 'red';
+    canvasCtx.lineWidth = 2;
+    canvasCtx.strokeRect(xMin, yMin, xMax - xMin, yMax - yMin);
+  }
+  
+  // Draw landmarks
+  function drawLandmarks(landmarks) {
+    for (const point of landmarks) {
+      const x = point.x * canvasElement.width;
+      const y = point.y * canvasElement.height;
+  
+      canvasCtx.beginPath();
+      canvasCtx.arc(x, y, 2, 0, 2 * Math.PI);
+      canvasCtx.fillStyle = 'blue';
+      canvasCtx.fill();
+    }
+  }
+  
+  // Detect facial expressions
+  function detectExpression(landmarks) {
+    const leftMouth = landmarks[61]; // Left corner of the mouth
+    const rightMouth = landmarks[291]; // Right corner of the mouth
+    const topMouth = landmarks[13]; // Upper lip
+    const bottomMouth = landmarks[14]; // Lower lip
+  
+    const mouthWidth = Math.hypot(
+      (rightMouth.x - leftMouth.x) * canvasElement.width,
+      (rightMouth.y - leftMouth.y) * canvasElement.height
+    );
+  
+    const mouthHeight = Math.hypot(
+      (topMouth.x - bottomMouth.x) * canvasElement.width,
+      (topMouth.y - bottomMouth.y) * canvasElement.height
+    );
+  
+    const ratio = mouthHeight / mouthWidth;
+  
+    let expression = "Neutral";
+    if (ratio > 0.4) expression = "Smile";
+    else if (ratio < 0.2) expression = "Frown";
+  
+    canvasCtx.fillStyle = "white";
+    canvasCtx.font = "16px Arial";
+    canvasCtx.fillText(`Expression: ${expression}`, 10, 20);
+  }
+  
+  // Calculate movement
+  function calculateMovement(landmarks) {
+    const keyPoints = [1, 4, 9]; // Use key points like nose tip and forehead
+    const movementData = [];
+  
+    for (const index of keyPoints) {
+      const x = landmarks[index].x * canvasElement.width;
+      const y = landmarks[index].y * canvasElement.height;
+  
+      if (previousPositions[index]) {
+        const prevX = previousPositions[index].x;
+        const prevY = previousPositions[index].y;
+  
+        const movement = Math.hypot(x - prevX, y - prevY);
+        movementData.push({ point: index, movement });
+      }
+  
+      previousPositions[index] = { x, y };
+    }
+  
+    // Display movement data
+    let movementText = "Movement: ";
+    for (const data of movementData) {
+      movementText += `Point ${data.point}: ${data.movement.toFixed(2)}px `;
+    }
+  
+    canvasCtx.fillStyle = "white";
+    canvasCtx.font = "16px Arial";
+    canvasCtx.fillText(movementText, 10, 40);
+  }
+  
+  // Setup camera
+  const camera = new Camera(videoElement, {
+    onFrame: async () => {
+      await faceMesh.send({ image: videoElement });
+    },
+    width: 640,
+    height: 480,
+  });
+  camera.start();
+  
+</script>
+</html> -->
